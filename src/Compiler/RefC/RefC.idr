@@ -815,23 +815,24 @@ getArgsNrList (x :: xs) k = k :: getArgsNrList xs (S k)
 
 
 cTypeOfCFType : CFType -> Core $ String
-cTypeOfCFType CFUnit          = pure $ "void"
-cTypeOfCFType CFInt           = pure $ "int"
-cTypeOfCFType CFUnsigned8     = pure $ "uint8_t"
-cTypeOfCFType CFUnsigned16    = pure $ "uint16_t"
-cTypeOfCFType CFUnsigned32    = pure $ "uint32_t"
-cTypeOfCFType CFUnsigned64    = pure $ "uint64_t"
-cTypeOfCFType CFString        = pure $ "char *"
-cTypeOfCFType CFDouble        = pure $ "double"
-cTypeOfCFType CFChar          = pure $ "char"
-cTypeOfCFType CFPtr           = pure $ "void *"
-cTypeOfCFType CFGCPtr         = pure $ "void *"
-cTypeOfCFType CFBuffer        = pure $ "void *"
-cTypeOfCFType CFWorld         = pure $ "void *"
-cTypeOfCFType (CFFun x y)     = pure $ "void *"
-cTypeOfCFType (CFIORes x)     = pure $ "void *"
-cTypeOfCFType (CFStruct x ys) = pure $ "void *"
-cTypeOfCFType (CFUser x ys)   = pure $ "void *"
+cTypeOfCFType CFUnit                          = pure $ "void"
+cTypeOfCFType CFInt                           = pure $ "int"
+cTypeOfCFType CFUnsigned8                     = pure $ "uint8_t"
+cTypeOfCFType CFUnsigned16                    = pure $ "uint16_t"
+cTypeOfCFType CFUnsigned32                    = pure $ "uint32_t"
+cTypeOfCFType CFUnsigned64                    = pure $ "uint64_t"
+cTypeOfCFType CFString                        = pure $ "char *"
+cTypeOfCFType CFDouble                        = pure $ "double"
+cTypeOfCFType CFChar                          = pure $ "char"
+cTypeOfCFType CFPtr                           = pure $ "void *"
+cTypeOfCFType CFGCPtr                         = pure $ "void *"
+cTypeOfCFType CFBuffer                        = pure $ "void *"
+cTypeOfCFType CFWorld                         = pure $ "void *"
+cTypeOfCFType (CFFun x y)                     = pure $ "void *"
+cTypeOfCFType (CFIORes x)                     = pure $ "void *"
+cTypeOfCFType (CFStruct x ys)                 = pure $ "void *"
+cTypeOfCFType (CFUser (NS _ (UN "Float")) []) = pure $ "float"
+cTypeOfCFType (CFUser x ys)                   = pure $ "void *"
 
 varNamesFromList : List ty -> Nat -> List String
 varNamesFromList str k = map (("var_" ++) . show) (getArgsNrList str k)
@@ -875,6 +876,7 @@ extractValue CFWorld         varName = "(Value_World*)" ++ varName
 extractValue (CFFun x y)     varName = "Value* " ++ varName ++ "/* function pointer not implemented */"
 extractValue (CFIORes x)     varName = extractValue x varName
 extractValue (CFStruct x xs) varName = "Value* " ++ varName ++ "/* struct access not implemented */"
+extractValue (CFUser (NS _ (UN "Float")) []) varName = "((Value_Float*)" ++ varName ++ ")->d"
 extractValue (CFUser x xs)   varName = "Value* " ++ varName
 
 packCFType : (cfType:CFType) -> (varName:String) -> String
@@ -894,6 +896,7 @@ packCFType CFWorld         varName = "makeWorld(" ++ varName ++ ")"
 packCFType (CFFun x y)     varName = "makeFunction(" ++ varName ++ ")"
 packCFType (CFIORes x)     varName = packCFType x varName
 packCFType (CFStruct x xs) varName = "makeStruct(" ++ varName ++ ")"
+packCFType (CFUser (NS _ (UN "Float")) []) varName = "makeFloat(" ++ varName ++ ")"
 packCFType (CFUser x xs)   varName = "makeCustomUser(" ++ varName ++ ")"
 
 discardLastArgument : List ty -> List ty

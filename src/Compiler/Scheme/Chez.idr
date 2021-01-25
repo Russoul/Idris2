@@ -103,6 +103,9 @@ showChezString (c ::cs) = (showChezChar c) . showChezString cs
 chezString : String -> String
 chezString cs = strCons '"' (showChezString (unpack cs) "\"")
 
+isFloatName : Name -> Bool
+isFloatName = (== mkNamespacedName (Just $ mkNamespace "System.FFI") "Float")
+
 mutual
   tySpec : NamedCExp -> Core String
   -- Primitive types have been converted to names for the purpose of matching
@@ -116,10 +119,11 @@ mutual
              (n == UN "GCPtr", pure "void*"),
              (n == UN "Buffer", pure "u8*")]
           (throw (GenericMsg fc ("Can't pass argument of type " ++ show n ++ " to foreign function")))
-  tySpec (NmCon fc (NS _ n) _ [])
+  tySpec (NmCon fc (NS ns n) _ [])
      = cond [(n == UN "Unit", pure "void"),
              (n == UN "AnyPtr", pure "void*"),
-             (n == UN "GCAnyPtr", pure "void*")]
+             (n == UN "GCAnyPtr", pure "void*"),
+             (n == UN "Float" && ns == mkNamespace "System.FFI", pure "float")]
           (throw (GenericMsg fc ("Can't pass argument of type " ++ show n ++ " to foreign function")))
   tySpec ty = throw (GenericMsg (getFC ty) ("Can't pass argument of type " ++ show ty ++ " to foreign function"))
 
@@ -186,6 +190,7 @@ cftySpec fc CFBuffer = pure "u8*"
 cftySpec fc (CFFun s t) = pure "void*"
 cftySpec fc (CFIORes t) = cftySpec fc t
 cftySpec fc (CFStruct n t) = pure $ "(* " ++ n ++ ")"
+cftySpec fc (CFUser (NS _ (UN "Float")) []) = pure "float"
 cftySpec fc t = throw (GenericMsg fc ("Can't pass argument of type " ++ show t ++
                          " to foreign function"))
 

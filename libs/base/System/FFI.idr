@@ -5,6 +5,17 @@
 module System.FFI
 
 export
+data Float : Type where [external]
+
+export
+Cast Double Float where
+  cast x = believe_me x
+
+export
+Cast Float Double where
+  cast x = believe_me x
+
+export
 data Struct : String -> -- C struct name
               List (String, Type) -> -- field names and types
               Type where
