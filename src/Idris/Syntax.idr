@@ -225,6 +225,7 @@ mutual
   public export
   data Directive : Type where
        Hide : Name -> Directive
+       Unhide : Name -> Directive
        Logging : Maybe LogLevel -> Directive
        LazyOn : Bool -> Directive
        UnboundImplicits : Bool -> Directive

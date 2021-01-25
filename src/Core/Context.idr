@@ -573,6 +573,9 @@ lookupCtxtName n ctxt
 hideName : Name -> Context -> Context
 hideName n ctxt = record { hidden $= insert n () } ctxt
 
+unhideName : Name -> Context -> Context
+unhideName n ctxt = record { hidden $= delete n } ctxt
+
 branchCtxt : Context -> Core Context
 branchCtxt ctxt = pure (record { branchDepth $= S } ctxt)
 
@@ -1559,6 +1562,19 @@ hide fc n
               | [] => throw (UndefinedName fc n)
               | res => throw (AmbiguousName fc (map fst res))
          put Ctxt (record { gamma $= hideName nsn } defs)
+
+-- Revert the action of hiding.
+export
+unhide : {auto c : Ref Ctxt Defs} ->
+       FC -> Name -> Core ()
+unhide fc n
+    = do defs <- get Ctxt
+         let g = gamma defs
+         let hidden = g.hidden
+         case lookup n hidden of
+           Just _ => do
+             put Ctxt (record { gamma $= unhideName n } defs)
+           Nothing => throw (UndefinedName fc n)
 
 export
 getVisibility : {auto c : Ref Ctxt Defs} ->
