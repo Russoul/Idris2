@@ -63,7 +63,9 @@ expandAmbigName mode nest env orig args (IVar fc x) exp
                                [nalt] =>
                                      do log "elab.ambiguous" 10 $ "Only one " ++ show (fst nalt)
                                         pure $ mkAlt primApp est nalt
-                               nalts => pure $ IAlternative fc
+                               nalts =>
+                                     do log "elab.ambiguous" 10 $ "Multiple candidates " ++ show (map fst nalts)
+                                        pure $ IAlternative fc
                                                       (uniqType primNs x args)
                                                       (map (mkAlt primApp est) nalts)
   where

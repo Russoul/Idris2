@@ -40,6 +40,10 @@ withArgHoles : EvalOpts
 withArgHoles = MkEvalOpts False True False empty False False Nothing []
 
 export
+andHolesOnly : EvalOpts -> EvalOpts
+andHolesOnly = {holesOnly := True, argHolesOnly := True}
+
+export
 tcOnly : EvalOpts
 tcOnly = record { tcInline = True } withArgHoles
 

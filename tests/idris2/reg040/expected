@@ -1,0 +1,12 @@
+1/1: Building EqualStreams (EqualStreams.idr)
+Error: While processing right hand side of repeatsTheSame_fail. When unifying x :: Delay (r2 x) = x :: Delay (r2 x) and r1 x = r2 x.
+Mismatch between: Delay (r2 x) and Delay (xs a x).
+
+EqualStreams.idr:12:25--12:29
+ 08 | r2 : a -> Stream a
+ 09 | r2 x = x :: r2 x
+ 10 | 
+ 11 | repeatsTheSame_fail : (x : a) -> r1 x === r2 x
+ 12 | repeatsTheSame_fail x = Refl
+                              ^^^^
+

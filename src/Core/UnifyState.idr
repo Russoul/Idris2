@@ -28,18 +28,10 @@ data Constraint : Type where
      MkConstraint : {vars : _} ->
                     FC ->
                     (withLazy : Bool) ->
+                    (modOpts : EvalOpts -> EvalOpts) ->
                     (env : Env Term vars) ->
                     (x : NF vars) -> (y : NF vars) ->
                     Constraint
-     -- An unsolved sequence of constraints, arising from arguments in an
-     -- application where solving later constraints relies on solving earlier
-     -- ones
-     MkSeqConstraint : {vars : _} ->
-                       FC ->
-                       (env : Env Term vars) ->
-                       (xs : List (NF vars)) ->
-                       (ys : List (NF vars)) ->
-                       Constraint
      -- A resolved constraint
      Resolved : Constraint
 
@@ -278,7 +270,7 @@ addDot fc env dotarg x reason y
          xnf <- nf defs env x
          ynf <- nf defs env y
          put UST (record { dotConstraints $=
-                             ((dotarg, reason, MkConstraint fc False env xnf ynf) ::)
+                             ((dotarg, reason, MkConstraint fc False id env xnf ynf) ::)
                          } ust)
 
 mkConstantAppArgs : {vars : _} ->
@@ -561,17 +553,11 @@ checkValidHole base (idx, (fc, n))
                      let Just c = lookup con (constraints ust)
                           | Nothing => pure ()
                      case c of
-                          MkConstraint fc l env x y =>
+                          MkConstraint fc l modOpts env x y =>
                              do put UST (record { guesses = empty } ust)
                                 empty <- clearDefs defs
-                                xnf <- quote empty env x
-                                ynf <- quote empty env y
-                                throw (CantSolveEq fc env xnf ynf)
-                          MkSeqConstraint fc env (x :: _) (y :: _) =>
-                             do put UST (record { guesses = empty } ust)
-                                empty <- clearDefs defs
-                                xnf <- quote empty env x
-                                ynf <- quote empty env y
+                                xnf <- quoteOpts empty modOpts env x
+                                ynf <- quoteOpts empty modOpts env y
                                 throw (CantSolveEq fc env xnf ynf)
                           _ => pure ()
               _ => traverse_ checkRef !(traverse getFullName
@@ -676,7 +662,7 @@ dumpHole str n hole
              case lookup cid (constraints ust) of
                   Nothing => pure ()
                   Just Resolved => logString str n "\tResolved"
-                  Just (MkConstraint _ lazy env x y) =>
+                  Just (MkConstraint _ lazy _ env x y) =>
                     do logString str n $
                          "\t  " ++ show !(toFullNames !(quote defs env x))
                                 ++ " =?= " ++ show !(toFullNames !(quote defs env y))
@@ -685,8 +671,6 @@ dumpHole str n hole
                          "\t    from " ++ show !(toFullNames !(quote empty env x))
                             ++ " =?= " ++ show !(toFullNames !(quote empty env y))
                             ++ if lazy then "\n\t(lazy allowed)" else ""
-                  Just (MkSeqConstraint _ _ xs ys) =>
-                       logString str n $ "\t\t" ++ show xs ++ " =?= " ++ show ys
 
 export
 dumpConstraints : {auto u : Ref UST UState} ->
