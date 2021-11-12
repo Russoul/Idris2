@@ -11,5 +11,6 @@ fi
 LD_LIBRARY_PATH="$DIR/idris2_app":$LD_LIBRARY_PATH
 PATH="$DIR/idris2_app":$PATH
 export LD_LIBRARY_PATH PATH
+export DYLD_LIBRARY_PATH="$DIR/idris2_app:$DYLD_LIBRARY_PATH"
 
 "$DIR/idris2_app/idris2-boot" "$@"
