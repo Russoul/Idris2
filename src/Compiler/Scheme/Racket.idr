@@ -342,7 +342,8 @@ startRacket racket appdir target = unlines
     , "  DIR=$(dirname \"$(readlink -f -- \"$0\")\")"
     , "fi"
     , ""
-    , "export LD_LIBRARY_PATH=\"$DIR/" ++ appdir ++ "\":$LD_LIBRARY_PATH"
+    , "export LD_LIBRARY_PATH=\"$DIR/" ++ appdir ++ ":$LD_LIBRARY_PATH\""
+    , "export DYLD_LIBRARY_PATH=\"$DIR/" ++ appdir ++ ":$DYLD_LIBRARY_PATH\""
     , racket ++ "\"$DIR/" ++ target ++ "\" \"$@\""
     ]
 
