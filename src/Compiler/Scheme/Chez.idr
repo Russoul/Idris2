@@ -371,6 +371,7 @@ startChezPreamble = unlines
 startChez : String -> String -> String
 startChez appdir target = startChezPreamble ++ unlines
     [ "export LD_LIBRARY_PATH=\"$DIR/" ++ appdir ++ "\":$LD_LIBRARY_PATH"
+    , "export DYLD_LIBRARY_PATH=\"$DIR/" ++ appdir ++ "\":$DYLD_LIBRARY_PATH"
     , "\"$DIR/" ++ target ++ "\" \"$@\""
     ]
 
