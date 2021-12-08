@@ -228,6 +228,9 @@ perror (PatternVariableUnifies fc env n tm)
 perror (CyclicMeta fc env n tm)
     = pure $ errorDesc (reflow "Cycle detected in solution of metavariable" <++> meta (pretty !(prettyName n)) <++> equals
         <++> code !(pshow env tm)) <+> line <+> !(ploc fc)
+perror (CyclicLevel fc)
+    = pure $ errorDesc (reflow "Cycle detected in universe level constraints")
+         <+> line <+> !(ploc fc)
 perror (WhenUnifying _ gam env x y err)
     = do defs <- get Ctxt
          setCtxt gam

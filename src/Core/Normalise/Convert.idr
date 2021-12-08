@@ -429,8 +429,8 @@ mutual
     convGen q i defs env (NErased _ _) _ = pure True
     convGen q i defs env _ (NErased _ _) = pure True
     convGen q i defs env (NType _ ul) (NType _ ur)
-        = -- TODO Cumulativity: Add constraint here
-          pure True
+        = do addLevelConstraintLte ul ur
+             pure True
     convGen q i defs env x y = pure False
 
   export

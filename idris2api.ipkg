@@ -50,6 +50,7 @@ modules =
     Core.Case.CaseBuilder,
     Core.Case.CaseTree,
     Core.Case.Util,
+    Core.CheckLevel,
     Core.CompileExpr,
     Core.Context,
     Core.Context.Context,

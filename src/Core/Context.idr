@@ -2381,3 +2381,21 @@ setIncData : {auto c : Ref Ctxt Defs} ->
 setIncData cg res
     = do defs <- get Ctxt
          put Ctxt (record { incData $= ((cg, res) :: )} defs)
+
+||| lhs <= rhs
+export
+addLevelConstraintLte : {auto c : Ref Ctxt Defs}
+                     -> (lhs : Name)
+                     -> (rhs : Name)
+                     -> Core ()
+addLevelConstraintLte lhs rhs = do
+  update Ctxt {gamma.uconstraints $= (ULE lhs rhs ::)}
+
+||| lhs < rhs
+export
+addLevelConstraintLt : {auto c : Ref Ctxt Defs}
+                    -> (lhs : Name)
+                    -> (rhs : Name)
+                    -> Core ()
+addLevelConstraintLt lhs rhs = do
+  update Ctxt {gamma.uconstraints $= (ULT lhs rhs ::)}

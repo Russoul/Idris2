@@ -1,6 +1,7 @@
 module Core.Unify
 
 import Core.Case.CaseTree
+import Core.CheckLevel
 import Core.Context
 import Core.Context.Log
 import Core.Core
@@ -1562,6 +1563,7 @@ solveConstraintsAfter start umode smode
                               (filter afterStart (toList (guesses ust)))
          when (any id progress) $
                solveConstraintsAfter start umode Normal
+         solveLevelConstraints EmptyFC
   where
     afterStart : (Int, a) -> Bool
     afterStart (x, _) = x >= start

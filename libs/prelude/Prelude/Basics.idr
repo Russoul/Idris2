@@ -180,3 +180,36 @@ data SnocList a =
   (:<) (SnocList a) a
 
 %name SnocList sx, sy, sz
+
+data In : (f : Type -> Type) -> Type where
+  MkIn : In f
+
+-- This step requires definitional type constructor injectivity and is
+-- the source of the problem.
+injIn : In x = In y -> x = y
+injIn Refl = Refl
+
+P : Type -> Type
+P x = (a : (Type -> Type) ** (In a = x, a x -> Void))
+
+inP : Type
+inP = In P
+
+--  inP ≡ In P ≡ In (\x => (a : (Type -> Type) ** (In a = x, a x -> Void)))
+-- P inP ≡ (a : (Type -> Type) ** (In a = In P, a (In P) -> Void))
+-- a : Type -> Type
+-- ha0 : In a = In P
+-- ha1 : a (In P)
+-- injIn ha0 : a = P
+-- ohNo : P (In P) -> Void
+-- ohNo (P)
+oops : P Basics.inP -> Void
+oops (a ** (ha0, ha1)) =
+  let ohNo : (P (In P) -> Void) = replace {p = \x => x (In P) -> Void} (injIn ha0) ha1 in
+  ohNo (P ** (Refl, ohNo))
+
+total -- for extra oumph!
+ohNo : Void
+ohNo =
+  let foo : P Basics.inP = (P ** (Refl, oops))
+  in oops foo

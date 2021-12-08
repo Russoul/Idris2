@@ -81,6 +81,7 @@ data Error : Type where
                               FC -> Env Term vars -> Name -> Term vars -> Error
      CyclicMeta : {vars : _} ->
                   FC -> Env Term vars -> Name -> Term vars -> Error
+     CyclicLevel : FC -> Error
      WhenUnifying : {vars : _} ->
                     FC -> Context -> Env Term vars -> Term vars -> Term vars -> Error -> Error
      ValidCase : {vars : _} ->
@@ -205,6 +206,8 @@ Show Error where
   show (CyclicMeta fc env n tm)
       = show fc ++ ":Cycle detected in metavariable solution " ++ show n
              ++ " = " ++ show tm
+  show (CyclicLevel fc)
+      = show fc ++ ":Cycle detected in universe level constraints"
   show (WhenUnifying fc _ _ x y err)
       = show fc ++ ":When unifying: " ++ show x ++ " and " ++ show y ++ "\n\t" ++ show err
   show (ValidCase fc _ prob)
@@ -379,6 +382,7 @@ getErrorLoc (CantConvert loc _ _ _ _) = Just loc
 getErrorLoc (CantSolveEq loc _ _ _ _) = Just loc
 getErrorLoc (PatternVariableUnifies loc _ _ _) = Just loc
 getErrorLoc (CyclicMeta loc _ _ _) = Just loc
+getErrorLoc (CyclicLevel loc) = Just loc
 getErrorLoc (WhenUnifying loc _ _ _ _ _) = Just loc
 getErrorLoc (ValidCase loc _ _) = Just loc
 getErrorLoc (UndefinedName loc _) = Just loc
