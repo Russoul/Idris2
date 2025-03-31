@@ -364,9 +364,9 @@ mutual
       "multiline" <++>
         (parenthesise (d > startPrec) $
            hsep $ punctuate "++" (prettyPStr <$> concat xs))
-    prettyPrec d (PDoBlock _ ns ds) =
+    prettyPrec d (PDoBlock _ ns implicitLifts ds) =
       parenthesise (d > startPrec) $ group $ align $ hang 2 $
-        do_ <++> (vsep $ punctuate semi (prettyPDo <$> ds))
+        if implicitLifts then do_' else do_ <++> (vsep $ punctuate semi (prettyPDo <$> ds))
     prettyPrec d (PBang _ tm) = "!" <+> prettyPrec d tm
     prettyPrec d (PIdiom _ Nothing tm) = enclose (keyword "[|") (keyword "|]") (pretty tm)
     prettyPrec d (PIdiom _ (Just ns) tm) = enclose (pretty0 ns <+> keyword ".[|") (keyword "|]") (pretty tm)

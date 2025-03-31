@@ -73,6 +73,10 @@ do_ : Doc IdrisSyntax
 do_ = keyword "do"
 
 export
+do_' : Doc IdrisSyntax
+do_' = keyword "do'"
+
+export
 with_ : Doc IdrisSyntax
 with_ = keyword "with"
 

@@ -146,8 +146,8 @@ mapPTermM f = goPTerm where
     goPTerm (PMultiline fc x y zs) =
       PMultiline fc x y <$> goPStringLines zs
       >>= f
-    goPTerm (PDoBlock fc ns xs) =
-      PDoBlock fc ns <$> goPDos xs
+    goPTerm (PDoBlock fc ns impLifts xs) =
+      PDoBlock fc ns impLifts <$> goPDos xs
       >>= f
     goPTerm (PBang fc x) =
       PBang fc <$> goPTerm x
@@ -480,8 +480,8 @@ mapPTerm f = goPTerm where
       = f $ PString fc x $ goPStr <$> ys
     goPTerm (PMultiline fc x y zs)
       = f $  PMultiline fc x y $ map (map goPStr) zs
-    goPTerm (PDoBlock fc ns xs)
-      = f $ PDoBlock fc ns $ goPDo <$> xs
+    goPTerm (PDoBlock fc ns impLifts xs)
+      = f $ PDoBlock fc ns impLifts $ goPDo <$> xs
     goPTerm (PBang fc x)
       = f $ PBang fc $ goPTerm x
     goPTerm (PIdiom fc ns x)
@@ -664,7 +664,7 @@ substFC fc = mapPTerm $ \case
   PBracketed _ x => PBracketed fc x
   PString _ x ys => PString fc x ys
   PMultiline _ x y zs => PMultiline fc x y zs
-  PDoBlock _ x xs => PDoBlock fc x xs
+  PDoBlock _ x impLifts xs => PDoBlock fc x impLifts xs
   PBang _ x => PBang fc x
   PIdiom _ x y => PIdiom fc x y
   PList _ _ xs => PList fc fc xs

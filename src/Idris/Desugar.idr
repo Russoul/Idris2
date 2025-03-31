@@ -259,6 +259,11 @@ addNS (Just ns) n@(NS _ _) = n
 addNS (Just ns) n = NS ns n
 addNS _ n = n
 
+embedFun : FC -> Maybe Namespace -> RawImp -> RawImp
+embedFun fc ns ma =
+  let fc = virtualiseFC fc in
+  IApp fc (IVar fc (addNS ns $ UN $ Basic "embed")) ma
+
 bindFun : FC -> Maybe Namespace -> RawImp -> RawImp -> RawImp
 bindFun fc ns ma f =
   let fc = virtualiseFC fc in
@@ -481,8 +486,8 @@ mutual
   desugarB side ps (PString fc hashtag strs)
       = expandString side ps fc hashtag strs
 
-  desugarB side ps (PDoBlock fc ns block)
-      = expandDo side ps fc ns block
+  desugarB side ps (PDoBlock fc ns implicitLifts block)
+      = expandDo side ps fc ns implicitLifts block
   desugarB side ps (PBang fc term)
       = do itm <- desugarB side ps term
            bs <- get Bang
@@ -540,7 +545,7 @@ mutual
                     PatClause fc (IVar fc (UN $ Basic "False")) !(desugar side ps e)]
   desugarB side ps (PComprehension fc ret conds) = do
         let ns = mbNamespace !(get Bang)
-        desugarB side ps (PDoBlock fc ns (map (guard ns) conds ++ [toPure ns ret]))
+        desugarB side ps (PDoBlock fc ns False (map (guard ns) conds ++ [toPure ns ret]))
     where
       guard : Maybe Namespace -> PDo -> PDo
       guard ns (DoExp fc tm)
@@ -725,25 +730,25 @@ mutual
              {auto u : Ref UST UState} ->
              {auto m : Ref MD Metadata} ->
              {auto o : Ref ROpts REPLOpts} ->
-             Side -> List Name -> FC -> Maybe Namespace -> List PDo -> Core RawImp
-  expandDo side ps fc ns [] = throw (GenericMsg fc "Do block cannot be empty")
-  expandDo side ps _ ns [DoExp fc tm] = desugarDo side ps ns tm
-  expandDo side ps fc ns [e]
+             Side -> List Name -> FC -> Maybe Namespace -> Bool -> List PDo -> Core RawImp
+  expandDo side ps fc ns impLifts [] = throw (GenericMsg fc "Do block cannot be empty")
+  expandDo side ps _ ns _ [DoExp fc tm] = desugarDo side ps ns tm
+  expandDo side ps fc ns _ [e]
       = throw (GenericMsg (getLoc e)
                   "Last statement in do block must be an expression")
-  expandDo side ps topfc ns (DoExp fc tm :: rest)
+  expandDo side ps topfc ns implicitLifts (DoExp fc tm :: rest)
       = do tm' <- desugarDo side ps ns tm
-           rest' <- expandDo side ps topfc ns rest
-           pure $ seqFun fc ns tm' rest'
-  expandDo side ps topfc ns (DoBind fc nameFC n rig ty tm :: rest)
+           rest' <- expandDo side ps topfc ns implicitLifts rest
+           pure $ seqFun fc ns (if implicitLifts then embedFun fc Nothing tm' else tm') rest'
+  expandDo side ps topfc ns implicitLifts (DoBind fc nameFC n rig ty tm :: rest)
       = do tm' <- desugarDo side ps ns tm
            whenJust (isConcreteFC nameFC) $ \nfc => addSemanticDecorations [(nfc, Bound, Just n)]
            ty' <- maybe (pure $ Implicit (virtualiseFC fc) False)
                         (\ty => desugarDo side ps ns ty) ty
-           rest' <- expandDo side ps topfc ns rest
-           pure $ bindFun fc ns tm'
+           rest' <- expandDo side ps topfc ns implicitLifts rest
+           pure $ bindFun fc ns (if implicitLifts then embedFun fc Nothing tm' else tm')
                 $ ILam nameFC rig Explicit (Just n) ty' rest'
-  expandDo side ps topfc ns (DoBindPat fc pat ty exp alts :: rest)
+  expandDo side ps topfc ns implicitLifts (DoBindPat fc pat ty exp alts :: rest)
       = do pat' <- desugarDo LHS ps ns pat
            (newps, bpat) <- bindNames False pat'
            exp' <- desugarDo side ps ns exp
@@ -754,25 +759,25 @@ mutual
            let patFC = virtualiseFC (getFC bpat)
            ty' <- maybe (pure $ Implicit fc False)
                         (\ty => desugarDo side ps ns ty) ty
-           rest' <- expandDo side ps' topfc ns rest
-           pure $ bindFun fc ns exp'
+           rest' <- expandDo side ps' topfc ns implicitLifts rest
+           pure $ bindFun fc ns (if implicitLifts then embedFun fc Nothing exp' else exp')
                 $ ILam EmptyFC top Explicit (Just (MN "_" 0))
                           ty'
                           (ICase fc [] (IVar patFC (MN "_" 0))
                                (Implicit fc False)
                                (PatClause fcOriginal bpat rest'
                                   :: alts'))
-  expandDo side ps topfc ns (DoLet fc lhsFC n rig ty tm :: rest)
+  expandDo side ps topfc ns implicitLifts (DoLet fc lhsFC n rig ty tm :: rest)
       = do b <- newRef Bang (initBangs ns)
            tm' <- desugarB side ps tm
            ty' <- desugarDo side ps ns ty
-           rest' <- expandDo side ps topfc ns rest
+           rest' <- expandDo side ps topfc ns implicitLifts rest
            whenJust (isConcreteFC lhsFC) $ \nfc =>
              addSemanticDecorations [(nfc, Bound, Just n)]
            let bind = ILet fc lhsFC rig n ty' tm' rest'
            bd <- get Bang
            pure $ bindBangs (bangNames bd) ns bind
-  expandDo side ps topfc ns (DoLetPat fc pat ty tm alts :: rest)
+  expandDo side ps topfc ns implicitLifts (DoLetPat fc pat ty tm alts :: rest)
       = do b <- newRef Bang (initBangs ns)
            pat' <- desugarDo LHS ps ns pat
            ty' <- desugarDo side ps ns ty
@@ -780,20 +785,20 @@ mutual
            tm' <- desugarB side ps tm
            alts' <- traverse (map snd . desugarClause ps True) alts
            let ps' = newps ++ ps
-           rest' <- expandDo side ps' topfc ns rest
+           rest' <- expandDo side ps' topfc ns implicitLifts rest
            bd <- get Bang
            let fc = virtualiseFC fc
            pure $ bindBangs (bangNames bd) ns $
                     ICase fc [] tm' ty'
                        (PatClause fc bpat rest'
                                   :: alts')
-  expandDo side ps topfc ns (DoLetLocal fc decls :: rest)
+  expandDo side ps topfc ns implicitLifts (DoLetLocal fc decls :: rest)
       = do decls' <- traverse (desugarDecl ps) decls
-           rest' <- expandDo side ps topfc ns rest
+           rest' <- expandDo side ps topfc ns implicitLifts rest
            pure $ ILocal fc (concat decls') rest'
-  expandDo side ps topfc ns (DoRewrite fc rule :: rest)
+  expandDo side ps topfc ns implicitLifts (DoRewrite fc rule :: rest)
       = do rule' <- desugarDo side ps ns rule
-           rest' <- expandDo side ps topfc ns rest
+           rest' <- expandDo side ps topfc ns implicitLifts rest
            pure $ IRewrite fc rule' rest'
 
   -- Replace all operator by function application

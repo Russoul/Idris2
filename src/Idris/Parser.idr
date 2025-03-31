@@ -955,20 +955,28 @@ mutual
            (rule, tm) <- pure b.val
            pure (PRewrite (boundToFC fname b) rule tm)
 
+  doKeyword : OriginDesc -> Rule Bool
+  doKeyword fname = decoratedKeyword fname "do" $> False <|> decoratedKeyword fname "do'" $> True
+
+  readDo : String -> Maybe Bool
+  readDo "do" = Just False
+  readDo "do'" = Just True
+  readDo _ = Nothing
+
   doBlock : OriginDesc -> IndentInfo -> Rule PTerm
   doBlock fname indents
-      = do b <- bounds $ decoratedKeyword fname "do" *> block (doAct fname)
+      = do b <- bounds [| (,) (doKeyword fname) (block (doAct fname)) |]
            commit
-           pure (PDoBlock (virtualiseFC $ boundToFC fname b) Nothing (concat b.val))
+           pure (PDoBlock (virtualiseFC $ boundToFC fname (map snd b)) Nothing (fst b.val) (concat (snd b.val)))
     <|> do nsdo <- bounds namespacedIdent
            -- TODO: need to attach metadata correctly here
-           the (EmptyRule PTerm) $ case nsdo.val of
-                (ns, "do") =>
+           the (EmptyRule PTerm) $ case mapSnd readDo nsdo.val of
+                (ns, Just doMode) =>
                    do commit
                       actions <- Core.bounds (block (doAct fname))
                       let fc = virtualiseFC $
                                boundToFC fname (mergeBounds nsdo actions)
-                      pure (PDoBlock fc ns (concat actions.val))
+                      pure (PDoBlock fc ns doMode (concat actions.val))
                 _ => fail "Not a namespaced 'do'"
 
   validPatternVar : Name -> EmptyRule ()

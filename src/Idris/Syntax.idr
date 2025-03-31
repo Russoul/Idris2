@@ -141,7 +141,7 @@ mutual
        -- Syntactic sugar
        PString : FC -> (hashtag : Nat) -> List (PStr' nm) -> PTerm' nm
        PMultiline : FC -> (hashtag : Nat) -> (indent : Nat) -> List (List (PStr' nm)) -> PTerm' nm
-       PDoBlock : FC -> Maybe Namespace -> List (PDo' nm) -> PTerm' nm
+       PDoBlock : FC -> Maybe Namespace -> (implicitLifts : Bool) -> List (PDo' nm) -> PTerm' nm
        PBang : FC -> PTerm' nm -> PTerm' nm
        PIdiom : FC -> Maybe Namespace -> PTerm' nm -> PTerm' nm
        PList : (full, nilFC : FC) -> List (FC, PTerm' nm) -> PTerm' nm
@@ -205,7 +205,7 @@ mutual
   getPTermLoc (PBracketed fc _) = fc
   getPTermLoc (PString fc _ _) = fc
   getPTermLoc (PMultiline fc _ _ _) = fc
-  getPTermLoc (PDoBlock fc _ _) = fc
+  getPTermLoc (PDoBlock fc _ _ _) = fc
   getPTermLoc (PBang fc _) = fc
   getPTermLoc (PIdiom fc _ _) = fc
   getPTermLoc (PList fc _ _) = fc
@@ -874,8 +874,10 @@ parameters {0 nm : Type} (toName : nm -> Name)
   showPTermPrec d (PBracketed _ tm) = "(" ++ showPTermPrec d tm ++ ")"
   showPTermPrec d (PString _ _ xs) = join " ++ " $ showPStr <$> xs
   showPTermPrec d (PMultiline _ _ indent xs) = "multiline (" ++ (join " ++ " $ showPStr <$> concat xs) ++ ")"
-  showPTermPrec d (PDoBlock _ ns ds)
+  showPTermPrec d (PDoBlock _ ns False ds)
         = "do " ++ showSep " ; " (map showDo ds)
+  showPTermPrec d (PDoBlock _ ns True ds)
+        = "do' " ++ showSep " ; " (map showDo ds)
   showPTermPrec d (PBang _ tm) = "!" ++ showPTermPrec d tm
   showPTermPrec d (PIdiom _ Nothing tm) = "[|" ++ showPTermPrec d tm ++ "|]"
   showPTermPrec d (PIdiom _ (Just ns) tm) = show ns ++ ".[|" ++ showPTermPrec d tm ++ "|]"
