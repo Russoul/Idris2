@@ -732,7 +732,9 @@ mutual
              {auto o : Ref ROpts REPLOpts} ->
              Side -> List Name -> FC -> Maybe Namespace -> Bool -> List PDo -> Core RawImp
   expandDo side ps fc ns impLifts [] = throw (GenericMsg fc "Do block cannot be empty")
-  expandDo side ps _ ns _ [DoExp fc tm] = desugarDo side ps ns tm
+  expandDo side ps _ ns implicitLifts [DoExp fc tm] = do
+    tm' <- desugarDo side ps ns tm
+    pure (if implicitLifts then embedFun fc Nothing tm' else tm')
   expandDo side ps fc ns _ [e]
       = throw (GenericMsg (getLoc e)
                   "Last statement in do block must be an expression")
