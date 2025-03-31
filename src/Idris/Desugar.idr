@@ -250,8 +250,9 @@ record BangData where
   nextName : Int
   bangNames : List (Name, FC, RawImp)
   mbNamespace : Maybe Namespace
+  embed : Bool
 
-initBangs : Maybe Namespace -> BangData
+initBangs : Maybe Namespace -> Bool -> BangData
 initBangs = MkBangData 0 []
 
 addNS : Maybe Namespace -> Name -> Name
@@ -274,11 +275,11 @@ seqFun fc ns ma mb =
   let fc = virtualiseFC fc in
   IApp fc (IApp fc (IVar fc (addNS ns (UN $ Basic ">>"))) ma) mb
 
-bindBangs : List (Name, FC, RawImp) -> Maybe Namespace -> RawImp -> RawImp
-bindBangs [] ns tm = tm
-bindBangs ((n, fc, btm) :: bs) ns tm
-    = bindBangs bs ns
-    $ bindFun fc ns btm
+bindBangs : List (Name, FC, RawImp) -> Maybe Namespace -> Bool -> RawImp -> RawImp
+bindBangs [] ns embed tm = tm
+bindBangs ((n, fc, btm) :: bs) ns embed tm
+    = bindBangs bs ns embed
+    $ bindFun fc ns (if embed then embedFun fc ns btm else btm)
     $ ILam EmptyFC top Explicit (Just n) (Implicit fc False) tm
 
 idiomise : FC -> Maybe Namespace -> Maybe Namespace -> RawImp -> RawImp
@@ -733,34 +734,34 @@ mutual
              Side -> List Name -> FC -> Maybe Namespace -> Bool -> List PDo -> Core RawImp
   expandDo side ps fc ns impLifts [] = throw (GenericMsg fc "Do block cannot be empty")
   expandDo side ps _ ns implicitLifts [DoExp fc tm] = do
-    tm' <- desugarDo side ps ns tm
+    tm' <- desugarDo side ps ns implicitLifts tm
     pure (if implicitLifts then embedFun fc Nothing tm' else tm')
   expandDo side ps fc ns _ [e]
       = throw (GenericMsg (getLoc e)
                   "Last statement in do block must be an expression")
   expandDo side ps topfc ns implicitLifts (DoExp fc tm :: rest)
-      = do tm' <- desugarDo side ps ns tm
+      = do tm' <- desugarDo side ps ns implicitLifts tm
            rest' <- expandDo side ps topfc ns implicitLifts rest
            pure $ seqFun fc ns (if implicitLifts then embedFun fc Nothing tm' else tm') rest'
   expandDo side ps topfc ns implicitLifts (DoBind fc nameFC n rig ty tm :: rest)
-      = do tm' <- desugarDo side ps ns tm
+      = do tm' <- desugarDo side ps ns implicitLifts tm
            whenJust (isConcreteFC nameFC) $ \nfc => addSemanticDecorations [(nfc, Bound, Just n)]
            ty' <- maybe (pure $ Implicit (virtualiseFC fc) False)
-                        (\ty => desugarDo side ps ns ty) ty
+                        (\ty => desugarDo side ps ns implicitLifts ty) ty
            rest' <- expandDo side ps topfc ns implicitLifts rest
            pure $ bindFun fc ns (if implicitLifts then embedFun fc Nothing tm' else tm')
                 $ ILam nameFC rig Explicit (Just n) ty' rest'
   expandDo side ps topfc ns implicitLifts (DoBindPat fc pat ty exp alts :: rest)
-      = do pat' <- desugarDo LHS ps ns pat
+      = do pat' <- desugarDo LHS ps ns implicitLifts pat
            (newps, bpat) <- bindNames False pat'
-           exp' <- desugarDo side ps ns exp
+           exp' <- desugarDo side ps ns implicitLifts exp
            alts' <- traverse (map snd . desugarClause ps True) alts
            let ps' = newps ++ ps
            let fcOriginal = fc
            let fc = virtualiseFC fc
            let patFC = virtualiseFC (getFC bpat)
            ty' <- maybe (pure $ Implicit fc False)
-                        (\ty => desugarDo side ps ns ty) ty
+                        (\ty => desugarDo side ps ns implicitLifts ty) ty
            rest' <- expandDo side ps' topfc ns implicitLifts rest
            pure $ bindFun fc ns (if implicitLifts then embedFun fc Nothing exp' else exp')
                 $ ILam EmptyFC top Explicit (Just (MN "_" 0))
@@ -770,19 +771,19 @@ mutual
                                (PatClause fcOriginal bpat rest'
                                   :: alts'))
   expandDo side ps topfc ns implicitLifts (DoLet fc lhsFC n rig ty tm :: rest)
-      = do b <- newRef Bang (initBangs ns)
+      = do b <- newRef Bang (initBangs ns implicitLifts)
            tm' <- desugarB side ps tm
-           ty' <- desugarDo side ps ns ty
+           ty' <- desugarDo side ps ns implicitLifts ty
            rest' <- expandDo side ps topfc ns implicitLifts rest
            whenJust (isConcreteFC lhsFC) $ \nfc =>
              addSemanticDecorations [(nfc, Bound, Just n)]
            let bind = ILet fc lhsFC rig n ty' tm' rest'
            bd <- get Bang
-           pure $ bindBangs (bangNames bd) ns bind
+           pure $ bindBangs (bangNames bd) ns implicitLifts bind
   expandDo side ps topfc ns implicitLifts (DoLetPat fc pat ty tm alts :: rest)
-      = do b <- newRef Bang (initBangs ns)
-           pat' <- desugarDo LHS ps ns pat
-           ty' <- desugarDo side ps ns ty
+      = do b <- newRef Bang (initBangs ns implicitLifts)
+           pat' <- desugarDo LHS ps ns implicitLifts pat
+           ty' <- desugarDo side ps ns implicitLifts ty
            (newps, bpat) <- bindNames False pat'
            tm' <- desugarB side ps tm
            alts' <- traverse (map snd . desugarClause ps True) alts
@@ -790,7 +791,7 @@ mutual
            rest' <- expandDo side ps' topfc ns implicitLifts rest
            bd <- get Bang
            let fc = virtualiseFC fc
-           pure $ bindBangs (bangNames bd) ns $
+           pure $ bindBangs (bangNames bd) ns implicitLifts $
                     ICase fc [] tm' ty'
                        (PatClause fc bpat rest'
                                   :: alts')
@@ -799,7 +800,7 @@ mutual
            rest' <- expandDo side ps topfc ns implicitLifts rest
            pure $ ILocal fc (concat decls') rest'
   expandDo side ps topfc ns implicitLifts (DoRewrite fc rule :: rest)
-      = do rule' <- desugarDo side ps ns rule
+      = do rule' <- desugarDo side ps ns implicitLifts rule
            rest' <- expandDo side ps topfc ns implicitLifts rest
            pure $ IRewrite fc rule' rest'
 
@@ -1367,12 +1368,12 @@ mutual
               {auto m : Ref MD Metadata} ->
               {auto u : Ref UST UState} ->
               {auto o : Ref ROpts REPLOpts} ->
-              Side -> List Name -> Maybe Namespace -> PTerm -> Core RawImp
-  desugarDo s ps doNamespace tm
-      = do b <- newRef Bang (initBangs doNamespace)
+              Side -> List Name -> Maybe Namespace -> Bool -> PTerm -> Core RawImp
+  desugarDo s ps doNamespace embed tm
+      = do b <- newRef Bang (initBangs doNamespace embed)
            tm' <- desugarB s ps tm
            bd <- get Bang
-           pure $ bindBangs (bangNames bd) doNamespace tm'
+           pure $ bindBangs (bangNames bd) doNamespace embed tm'
 
   export
   desugar : {auto s : Ref Syn SyntaxInfo} ->
@@ -1382,4 +1383,4 @@ mutual
             {auto o : Ref ROpts REPLOpts} ->
             Side -> List Name -> PTerm -> Core RawImp
 
-  desugar s ps tm = desugarDo s ps Nothing tm
+  desugar s ps tm = desugarDo s ps Nothing False tm
