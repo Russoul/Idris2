@@ -275,8 +275,10 @@ seqFun fc ns ma mb =
   let fc = virtualiseFC fc in
   IApp fc (IApp fc (IVar fc (addNS ns (UN $ Basic ">>"))) ma) mb
 
+-- ⟦f !(embed e)⟧ = ⟦e | f x⟧ = embed e >>= embed (f x)
+-- ⟦embed (f !a !b)⟧ = ⟦b/y | f !a y⟧ = ⟦a/x b/y | embed (f x y)⟧ = ⟦a / x | embed b >>= \y => embed (f x y)⟧ = embed a >>= \x => embed b >>= \y => embed (f x y)
 bindBangs : List (Name, FC, RawImp) -> Maybe Namespace -> Bool -> RawImp -> RawImp
-bindBangs [] ns embed tm = if embed then embedFun (getFC tm) ns tm else tm
+bindBangs [] ns embed tm = tm
 bindBangs ((n, fc, btm) :: bs) ns embed tm
     = bindBangs bs ns embed
     $ bindFun fc ns (if embed then embedFun fc ns btm else btm)
@@ -1373,7 +1375,7 @@ mutual
       = do b <- newRef Bang (initBangs doNamespace embed)
            tm' <- desugarB s ps tm
            bd <- get Bang
-           pure $ bindBangs (bangNames bd) doNamespace embed tm'
+           pure $ bindBangs (bangNames bd) doNamespace embed (if embed then embedFun (getFC tm') doNamespace tm' else tm')
 
   export
   desugar : {auto s : Ref Syn SyntaxInfo} ->
